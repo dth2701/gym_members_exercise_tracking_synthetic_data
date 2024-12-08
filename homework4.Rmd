@@ -1,0 +1,81 @@
+---
+title: "Homework 4 - Stat 436"
+author: "Huong Do"
+date: "2024-12-8"
+output: html_document
+---
+```{r setup, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(readr)
+```
+
+## Data preprocessing
+
+```{r, warning = FALSE, results = 'hide', message = FALSE}
+
+data = read_csv("gym_members_exercise_tracking_synthetic_data.csv")
+
+data <- data %>%
+  filter(!is.na(Age), !is.na(BMI), !is.na(Experience_Level),
+         !is.na(Calories_Burned), !is.na(`Workout_Frequency (days/week)`)) %>%
+  mutate(across(c(Age, BMI, Experience_Level, Calories_Burned, 
+                  `Workout_Frequency (days/week)`), scale))
+
+set.seed(123)
+k <- 3
+clusters <- kmeans(data %>% select(Age, BMI, Experience_Level, 
+                                 Calories_Burned, `Workout_Frequency (days/week)`), 
+                  centers = k)
+data$Cluster <- as.factor(clusters$cluster)
+
+```
+
+## Visualization 1: Member Profile Clusters
+
+```{r}
+viz1 <- ggplot(data, aes(x = Age, y = BMI, color = Cluster)) +
+  geom_point(alpha = 0.6) +
+  geom_point(data = as.data.frame(clusters$centers), 
+             aes(x = Age * sd(data$Age) + mean(data$Age),
+                 y = BMI * sd(data$BMI) + mean(data$BMI)),
+             color = "black", size = 5, shape = 8) +
+  scale_color_brewer(palette = "Set1") +
+  labs(title = "Gym Member Profile Clusters",
+       subtitle = "Based on Age, BMI, Experience, Calories Burned, and Workout Frequency",
+       x = "Age",
+       y = "BMI") +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold"),
+        legend.position = "bottom")
+
+viz1
+```
+
+
+## Visualization 2: Cluster Characteristics Heatmap
+
+```{r}
+cluster_summary <- data %>%
+  group_by(Cluster) %>%
+  summarize(across(c(Age, BMI, Experience_Level, Calories_Burned, 
+                     `Workout_Frequency (days/week)`),
+                   ~ mean(.), .names = "{.col}")) %>%
+  gather(key = "Metric", value = "Value", -Cluster)
+
+viz2 <- ggplot(cluster_summary, aes(x = Cluster, y = Metric, fill = Value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "white", high = "steelblue", 
+                      midpoint = 0) +
+  labs(title = "Cluster Characteristics Heatmap",
+       subtitle = "Average standardized values for each cluster",
+       x = "Cluster Group",
+       y = "Metrics") +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold"),
+        axis.text.x = element_text(angle = 0),
+        legend.position = "right")
+
+viz2
+```
